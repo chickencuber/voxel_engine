@@ -1,3 +1,4 @@
+#include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
 
@@ -10,6 +11,9 @@
 #include <assets/textures/cobbled_stone.h>
 #include <assets/shaders/geo.h>
 #include <assets/textures/grass.h>
+#include <assets/textures/dirt.h>
+#include <assets/textures/grass_side.h>
+
 #include <string.h>
 #include <cglm/cglm.h>
 
@@ -49,7 +53,7 @@ GLuint create_shader_program(const char* vert_src, const char* frag_src, const c
         return 0;
     }
     GLuint geo = compile_shader(geo_shader, GL_GEOMETRY_SHADER);
-    if (fragment == 0) {
+    if (geo == 0) {
         glDeleteShader(vertex);
         glDeleteShader(fragment);
         return 0;
@@ -280,20 +284,164 @@ Img load_image(unsigned char*data, int len, int desired, UV* uv) {
 }
 
 struct {
-    UV Cobbled_Stone;
-    UV Grass;
+    UV Cobbled_Stone, Grass, Dirt, Grass_Side;
 } Textures = {};
+
+
+typedef struct {
+    const char* name;
+    UV* top_texture; 
+    UV* bottom_texture; 
+    UV* side_texture;
+}  Block;
+
+struct {
+    Block Grass_Block;
+    Block Dirt_Block;
+    Block Cobbled_Stone_Block;
+} Blocks = {
+    .Grass_Block = (Block) {
+        .top_texture = &Textures.Grass,
+        .side_texture = &Textures.Grass_Side,
+        .bottom_texture = &Textures.Dirt,
+        .name = "Grass Block",
+    },
+    .Dirt_Block = (Block) {
+        .side_texture = &Textures.Dirt,
+        .top_texture = &Textures.Dirt,
+        .bottom_texture = &Textures.Dirt,
+        .name = "Dirt Block",
+    },
+    .Cobbled_Stone_Block = (Block) {
+        .side_texture = &Textures.Cobbled_Stone,
+        .top_texture = &Textures.Cobbled_Stone,
+        .bottom_texture = &Textures.Cobbled_Stone,
+        .name = "Cobbled Stone Block",
+    },
+};
 
 unsigned char* get_atlas(int* out_width, int*out_height, int* out_channels, int desired) {
     Img cobbled_stone = load_image(__assets_textures_cobbled_stone_png, __assets_textures_cobbled_stone_png_len, desired, &Textures.Cobbled_Stone);
     Img grass = load_image(__assets_textures_grass_png, __assets_textures_grass_png_len, desired, &Textures.Grass);
+    Img dirt = load_image(__assets_textures_dirt_png, __assets_textures_dirt_png_len, desired, &Textures.Dirt);
+    Img grass_side = load_image(__assets_textures_grass_side_png, __assets_textures_grass_side_png_len, desired, &Textures.Grass_Side);
     unsigned char* atlas =  generate_texture_atlas_struct((Img[]) {
             cobbled_stone,
             grass,
-            }, 2, desired, out_width, out_height, out_channels);
+            dirt,
+            grass_side
+            }, 4, desired, out_width, out_height, out_channels);
     stbi_image_free(cobbled_stone.data);
     stbi_image_free(grass.data);
+    stbi_image_free(dirt.data);
+    stbi_image_free(grass_side.data);
     return atlas;
+}
+
+typedef struct {
+    float* vertices;
+    size_t vertices_len;
+    size_t vertices_limit;
+    unsigned int* indices;
+    size_t indices_len;
+    size_t indices_limit;
+} MeshBuffer;
+
+MeshBuffer new_MeshBuffer() {
+    return (MeshBuffer) {
+        .indices = malloc(sizeof(int)),//malloc 1 int
+        .indices_limit=1,
+        .indices_len=0,
+        .vertices = malloc(sizeof(float)), //malloc 1 float
+        .vertices_limit=1,
+        .vertices_len=0,
+    };
+}
+void push_vert(MeshBuffer* buffer, float vert) {
+    if(buffer->vertices_limit <= buffer->vertices_len) {
+        buffer->vertices_limit*=2;
+        buffer->vertices = realloc(buffer->vertices, sizeof(float) * buffer->vertices_limit);
+    }
+    buffer->vertices[buffer->vertices_len] = vert;
+    buffer->vertices_len++;
+}
+void push_index(MeshBuffer* buffer, unsigned int index) {
+    if(buffer->indices_limit <= buffer->indices_len) {
+        buffer->indices_limit*=2;
+        buffer->indices = realloc(buffer->indices , sizeof(int) * buffer->indices_limit);
+    }
+    buffer->indices[buffer->indices_len] = index;
+    buffer->indices_len++;
+}
+
+void createBlock(MeshBuffer* buffer, Block block, vec3 pos) {
+    size_t prelen = buffer->vertices_len/5;
+    float vertices[] = {
+        // posX face
+        pos[0]+0.5f,pos[1]+  0.5f,pos[2]+ -0.5f,  block.side_texture->umax, block.side_texture->vmax,
+        pos[0]+0.5f,pos[1]+ -0.5f,pos[2]+ -0.5f,  block.side_texture->umax, block.side_texture->vmin,
+        pos[0]+0.5f,pos[1]+ -0.5f,pos[2]+  0.5f,  block.side_texture->umin, block.side_texture->vmin,
+        pos[0]+0.5f,pos[1]+  0.5f,pos[2]+  0.5f,  block.side_texture->umin, block.side_texture->vmax,
+
+        // negX face
+        pos[0]+-0.5f,pos[1]+  0.5f,pos[2]+  0.5f,  block.side_texture->umax, block.side_texture->vmax,
+        pos[0]+-0.5f,pos[1]+ -0.5f,pos[2]+  0.5f,  block.side_texture->umax, block.side_texture->vmin,
+        pos[0]+-0.5f,pos[1]+ -0.5f,pos[2]+ -0.5f,  block.side_texture->umin, block.side_texture->vmin,
+        pos[0]+-0.5f,pos[1]+  0.5f,pos[2]+ -0.5f,  block.side_texture->umin, block.side_texture->vmax,
+
+        // posY face
+        pos[0]+-0.5f,pos[1]+  0.5f,pos[2]+  0.5f,  block.top_texture->umin, block.top_texture->vmax,
+        pos[0]+0.5f,pos[1]+  0.5f,pos[2]+  0.5f,  block.top_texture->umax, block.top_texture->vmax,
+        pos[0]+0.5f,pos[1]+  0.5f,pos[2]+ -0.5f,  block.top_texture->umax, block.top_texture->vmin,
+        pos[0]+-0.5f,pos[1]+  0.5f,pos[2]+ -0.5f,  block.top_texture->umin, block.top_texture->vmin,
+
+        // negY face
+        pos[0]+-0.5f,pos[1]+ -0.5f,pos[2]+ -0.5f,  block.bottom_texture->umin, block.bottom_texture->vmax,
+        pos[0]+0.5f,pos[1]+ -0.5f,pos[2]+ -0.5f,  block.bottom_texture->umax, block.bottom_texture->vmax,
+        pos[0]+0.5f,pos[1]+ -0.5f,pos[2]+  0.5f,  block.bottom_texture->umax, block.bottom_texture->vmin,
+        pos[0]+-0.5f,pos[1]+ -0.5f,pos[2]+  0.5f,  block.bottom_texture->umin, block.bottom_texture->vmin,
+
+        // posZ face
+        pos[0]+0.5f,pos[1]+  0.5f,pos[2]+  0.5f,  block.side_texture->umax, block.side_texture->vmax,
+        pos[0]+0.5f,pos[1]+ -0.5f,pos[2]+  0.5f,  block.side_texture->umax, block.side_texture->vmin,
+        pos[0]+-0.5f,pos[1]+ -0.5f,pos[2]+  0.5f,  block.side_texture->umin, block.side_texture->vmin,
+        pos[0]+-0.5f,pos[1]+  0.5f,pos[2]+  0.5f,  block.side_texture->umin, block.side_texture->vmax,
+
+        // negZ face
+        pos[0]+-0.5f,pos[1]+  0.5f,pos[2]+ -0.5f,  block.side_texture->umax, block.side_texture->vmax,
+        pos[0]+-0.5f,pos[1]+ -0.5f,pos[2]+ -0.5f,  block.side_texture->umax, block.side_texture->vmin,
+        pos[0]+0.5f,pos[1]+ -0.5f,pos[2]+ -0.5f,  block.side_texture->umin, block.side_texture->vmin,
+        pos[0]+0.5f,pos[1]+  0.5f,pos[2]+ -0.5f,  block.side_texture->umin, block.side_texture->vmax,
+    };
+
+    unsigned int indices[] = {
+        prelen+2,prelen+1,prelen+0,
+        prelen+3,prelen+2,prelen+0,
+        prelen+6,prelen+5,prelen+4,
+        prelen+7,prelen+6,prelen+4,
+        prelen+8,prelen+9,prelen+10,
+        prelen+8,prelen+10,prelen+11,
+        prelen+12,prelen+13,prelen+14,
+        prelen+12,prelen+14,prelen+15,
+        prelen+18,prelen+17,prelen+16,
+        prelen+19,prelen+18,prelen+16,
+        prelen+22,prelen+21,prelen+20,
+        prelen+23,prelen+22,prelen+20
+    };
+    for(size_t i = 0; i < sizeof(indices)/sizeof(int); i++) {
+        push_index(buffer, indices[i]);
+    }
+    for(size_t i = 0; i < sizeof(vertices)/sizeof(float); i++) {
+        push_vert(buffer, vertices[i]);
+    }
+}
+void free_buffer(MeshBuffer* buffer) {
+    free(buffer->vertices);
+    free(buffer->indices);
+    buffer->vertices = NULL;
+    buffer->indices = NULL;
+    buffer->vertices_len = buffer->vertices_limit = 0;
+    buffer->indices_len = buffer->indices_limit = 0;
 }
 
 int main(void) {
@@ -351,59 +499,12 @@ int main(void) {
         glfwTerminate();
         return -1;
     }
-    UV text = Textures.Cobbled_Stone;
-    float vertices[] = {
-        // posX face
-        0.5f,  0.5f, -0.5f,  text.umax, text.vmax,
-        0.5f, -0.5f, -0.5f,  text.umax, text.vmin,
-        0.5f, -0.5f,  0.5f,  text.umin, text.vmin,
-        0.5f,  0.5f,  0.5f,  text.umin, text.vmax,
 
-        // negX face
-        -0.5f,  0.5f,  0.5f,  text.umax, text.vmax,
-        -0.5f, -0.5f,  0.5f,  text.umax, text.vmin,
-        -0.5f, -0.5f, -0.5f,  text.umin, text.vmin,
-        -0.5f,  0.5f, -0.5f,  text.umin, text.vmax,
-
-        // posY face
-        -0.5f,  0.5f,  0.5f,  text.umin, text.vmax,
-        0.5f,  0.5f,  0.5f,  text.umax, text.vmax,
-        0.5f,  0.5f, -0.5f,  text.umax, text.vmin,
-        -0.5f,  0.5f, -0.5f,  text.umin, text.vmin,
-
-        // negY face
-        -0.5f, -0.5f, -0.5f,  text.umin, text.vmax,
-        0.5f, -0.5f, -0.5f,  text.umax, text.vmax,
-        0.5f, -0.5f,  0.5f,  text.umax, text.vmin,
-        -0.5f, -0.5f,  0.5f,  text.umin, text.vmin,
-
-        // posZ face
-        0.5f,  0.5f,  0.5f,  text.umax, text.vmax,
-        0.5f, -0.5f,  0.5f,  text.umax, text.vmin,
-        -0.5f, -0.5f,  0.5f,  text.umin, text.vmin,
-        -0.5f,  0.5f,  0.5f,  text.umin, text.vmax,
-
-        // negZ face
-        -0.5f,  0.5f, -0.5f,  text.umax, text.vmax,
-        -0.5f, -0.5f, -0.5f,  text.umax, text.vmin,
-        0.5f, -0.5f, -0.5f,  text.umin, text.vmin,
-        0.5f,  0.5f, -0.5f,  text.umin, text.vmax,
-    };
-
-    unsigned int indices[] = {
-        2,1,0,
-        3,2,0,
-        6,5,4,
-        7,6,4,
-        8,9,10,
-        8,10,11,
-        12,13,14,
-        12,14,15,
-        18,17,16,
-        19,18,16,
-        22,21,20,
-        23,22,20
-    };
+    MeshBuffer buffer = new_MeshBuffer();
+    createBlock(&buffer, Blocks.Cobbled_Stone_Block, (vec3){0, 0, 0});
+    createBlock(&buffer, Blocks.Dirt_Block, (vec3){2, 0, 0});
+    createBlock(&buffer, Blocks.Grass_Block, (vec3){0, 0, 2});
+    
     GLuint VBO, VAO, EBO;
     glGenVertexArrays(1, &VAO);
     glGenBuffers(1, &VBO);
@@ -414,10 +515,10 @@ int main(void) {
     glBindVertexArray(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float)*buffer.vertices_limit, buffer.vertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(int)*buffer.indices_limit, buffer.indices, GL_STATIC_DRAW);
 
     // position attribute
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), (void*)0);
@@ -483,11 +584,12 @@ int main(void) {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glBindVertexArray(VAO);
-        glDrawElements(GL_TRIANGLES, (sizeof(indices)/sizeof(int)), GL_UNSIGNED_INT, 0);
+        glDrawElements(GL_TRIANGLES, buffer.indices_len, GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
 
         glfwSwapBuffers(window);
     }
+    free_buffer(&buffer);
 
     glDeleteVertexArrays(1, &VAO);
     glDeleteBuffers(1, &VBO);

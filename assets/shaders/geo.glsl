@@ -18,15 +18,15 @@ void main() {
     }
     EndPrimitive();
     // extra solid color triangle
-    gl_Position = vec4(-1.0, -1.0, 0.9999, 1.0);
+    gl_Position = vec4(-1.0, -1.0, 0.999999, 1.0);
     isSolidColor = 1;   // solid color
     EmitVertex();
 
-    gl_Position = vec4(1, -1.0, 0.9999, 1.0);
+    gl_Position = vec4(1, -1.0, 0.999999, 1.0);
     isSolidColor = 1;
     EmitVertex();
 
-    gl_Position = vec4(0, 1, 0.9999, 1.0);
+    gl_Position = vec4(0, 1, 0.999999, 1.0);
     isSolidColor = 1;
     EmitVertex();
 

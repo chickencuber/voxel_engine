@@ -3,7 +3,6 @@
 #include "build.h"
 
 
-
 void compile_cmake(string name) {
     char build_dir[BufferSize] = {'\0'};
     sprintf(build_dir, "./deps/%s/build/", name);
@@ -47,6 +46,8 @@ void make_assets() {
     }
     compile_asset("./assets/textures/cobbled_stone.png", "./target/assets/textures/cobbled_stone.h");
     compile_asset("./assets/textures/grass.png", "./target/assets/textures/grass.h");
+    compile_asset("./assets/textures/dirt.png", "./target/assets/textures/dirt.h");
+    compile_asset("./assets/textures/grass_side.png", "./target/assets/textures/grass_side.h");
 }
 
 int main() {
@@ -78,8 +79,10 @@ int main() {
                 "./target/assets/shaders/geo.h",
                 "./target/assets/textures/cobbled_stone.h",
                 "./target/assets/textures/grass.h", 
+                "./target/assets/textures/dirt.h",
+                "./target/assets/textures/grass_side.h"
                 ), 
-            6, 
+            8, 
             FlagArray(
                 FLAG_COMPILE_ONLY, 
                 FLAG_INCLUDE_PATH("./deps/glfw/include/"), 
