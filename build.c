@@ -1,3 +1,4 @@
+//due to cmake not actually building the project, and just generating vsproj files on windows, windows is borked, linux works though
 #include <stdio.h>
 #define BUILD_IMPLEMENTATION
 #include "build.h"
@@ -45,7 +46,8 @@ void compile_cmake(string name) {
         sprintf(cmd, "cmake -S ./deps/%s -B ./deps/%s/build/ -DCGLM_SHARED=OFF -DCGLM_STATIC=ON", name, name);
         system(cmd);
         cmd[0] = '\0';
-        sprintf(cmd, "cmake --build ./deps/%s/build/", name);
+        sprintf(cmd, "cmake --build ./deps/%s/build/ --config Release", name);
+
         system(cmd);
     } else {
         printf("not rebuilding %s\n", name);
