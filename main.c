@@ -299,26 +299,28 @@ struct {
     Block Grass_Block;
     Block Dirt_Block;
     Block Cobbled_Stone_Block;
-} Blocks = {
-    .Grass_Block = (Block) {
+} Blocks;
+
+void init_Blocks() {
+    Blocks.Grass_Block = (Block){
         .top_texture = &Textures.Grass,
-        .side_texture = &Textures.Grass_Side,
-        .bottom_texture = &Textures.Dirt,
-        .name = "Grass Block",
-    },
-    .Dirt_Block = (Block) {
-        .side_texture = &Textures.Dirt,
+            .side_texture = &Textures.Grass_Side,
+            .bottom_texture = &Textures.Dirt,
+            .name = "Grass Block",
+    };
+    Blocks.Dirt_Block = (Block){
         .top_texture = &Textures.Dirt,
-        .bottom_texture = &Textures.Dirt,
-        .name = "Dirt Block",
-    },
-    .Cobbled_Stone_Block = (Block) {
-        .side_texture = &Textures.Cobbled_Stone,
+            .side_texture = &Textures.Dirt,
+            .bottom_texture = &Textures.Dirt,
+            .name = "Dirt Block",
+    };
+    Blocks.Cobbled_Stone_Block = (Block){
         .top_texture = &Textures.Cobbled_Stone,
-        .bottom_texture = &Textures.Cobbled_Stone,
-        .name = "Cobbled Stone Block",
-    },
-};
+            .side_texture = &Textures.Cobbled_Stone,
+            .bottom_texture = &Textures.Cobbled_Stone,
+            .name = "Cobbled Stone Block",
+    };
+}
 
 unsigned char* get_atlas(int* out_width, int*out_height, int* out_channels, int desired) {
     Img cobbled_stone = load_image(__assets_textures_cobbled_stone_png, __assets_textures_cobbled_stone_png_len, desired, &Textures.Cobbled_Stone);
@@ -445,6 +447,7 @@ void free_buffer(MeshBuffer* buffer) {
 }
 
 int main(void) {
+    init_Blocks();
     char* vert_shader = len_to_cstr(__assets_shaders_vert_glsl, __assets_shaders_vert_glsl_len);
     char* frag_shader = len_to_cstr(__assets_shaders_frag_glsl, __assets_shaders_frag_glsl_len);
     char* geo_shader = len_to_cstr(__assets_shaders_geo_glsl, __assets_shaders_geo_glsl_len);
