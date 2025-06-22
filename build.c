@@ -37,7 +37,7 @@
 
 
 
-void compile_cmake(string name) {
+void compile_cmake(string name, string winsln) {
     char build_dir[BufferSize] = {'\0'};
     sprintf(build_dir, "./deps/%s/build/", name);
     if(!Build.fs.exists(build_dir)) {
@@ -46,9 +46,13 @@ void compile_cmake(string name) {
         sprintf(cmd, "cmake -S ./deps/%s -B ./deps/%s/build/ -DCGLM_SHARED=OFF -DCGLM_STATIC=ON", name, name);
         system(cmd);
         cmd[0] = '\0';
-        sprintf(cmd, "cmake --build ./deps/%s/build/ --config Release", name);
-
+        sprintf(cmd, "cmake --build ./deps/%s/build/", name);
         system(cmd);
+#ifdef _WIN32
+        cmd[0] = '\0';
+        sprintf(cmd, "msbuild /deps/%s/build/%s.sln", name, winsln);
+        system(cmd);
+#endif
     } else {
         printf("not rebuilding %s\n", name);
     }
@@ -91,9 +95,9 @@ int main() {
     }
     make_assets();
     Build.fetch_git("https://github.com/glfw/glfw.git", false);
-    compile_cmake("glfw");
+    compile_cmake("glfw", "GLFW");
     Build.fetch_git("https://github.com/recp/cglm.git", false);
-    compile_cmake("cglm");
+    compile_cmake("cglm", "cglm");
     Build.fetch_git("https://github.com/nothings/stb.git", false);
     Build.build(
             OBJECT("./target/glad"), 
