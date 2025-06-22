@@ -3,6 +3,39 @@
 #include "build.h"
 
 
+#ifdef _MSC_VER
+  #define LIB ".lib"
+#else
+  #define LIB ".a"
+#endif
+
+#ifdef _MSC_VER
+    #define PLATFORM_LIBS FlagArray( \
+        FLAG_RAW("opengl32.lib"), \
+        FLAG_RAW("user32.lib"), \
+        FLAG_RAW("gdi32.lib"), \
+        FLAG_RAW("kernel32.lib"), \
+        FLAG_RAW("shell32.lib"), \
+        FLAG_RAW("advapi32.lib"), \
+        FLAG_RAW("ws2_32.lib"), \
+        FLAG_RAW("ole32.lib"), \
+        FLAG_RAW("uuid.lib") \
+    ), 9
+#else
+    #define PLATFORM_LIBS FlagArray( \
+        FLAG_RAW("-lwayland-client"), \
+        FLAG_RAW("-lwayland-cursor"), \
+        FLAG_RAW("-lwayland-egl"), \
+        FLAG_RAW("-lEGL"), \
+        FLAG_RAW("-lGL"), \
+        FLAG_RAW("-lm"), \
+        FLAG_RAW("-lpthread"), \
+        FLAG_RAW("-ldl") \
+    ), 8
+#endif
+
+
+
 void compile_cmake(string name) {
     char build_dir[BufferSize] = {'\0'};
     sprintf(build_dir, "./deps/%s/build/", name);
@@ -61,7 +94,7 @@ int main() {
     compile_cmake("cglm");
     Build.fetch_git("https://github.com/nothings/stb.git", false);
     Build.build(
-            "./target/glad.o", 
+            OBJECT("./target/glad"), 
             StringArray("./glad/src/gl.c"), 
             1, 
             FlagArray(
@@ -71,7 +104,7 @@ int main() {
             2
             );
     Build.build(
-            "./target/main.o", 
+            OBJECT("./target/main"), 
             StringArray(
                 "./main.c", 
                 "./target/assets/shaders/frag.h", 
@@ -93,20 +126,10 @@ int main() {
                 ),
             6);
     Build.build(
-            "./main",
-            StringArray("./target/main.o", "./deps/glfw/build/src/libglfw3.a", "./target/glad.o", "./deps/cglm/build/libcglm.a"),
+            EXECUTABLE("./main"),
+            StringArray(OBJECT("./target/main"), "./deps/glfw/build/src/libglfw3"LIB, OBJECT("./target/glad"), "./deps/cglm/build/libcglm"LIB),
             4,
-            FlagArray(
-                FLAG_RAW("-lwayland-client"),
-                FLAG_RAW("-lwayland-cursor"),
-                FLAG_RAW("-lwayland-egl"),
-                FLAG_RAW("-lEGL"),
-                FLAG_RAW("-lGL"),
-                FLAG_RAW("-lm"),
-                FLAG_RAW("-lpthread"),
-                FLAG_RAW("-ldl"),
-                ),
-            8
+            PLATFORM_LIBS
             );
     return 0;
 }

@@ -4,7 +4,6 @@
 #else
 #define EXTERN extern
 #endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,10 +13,20 @@
 #ifdef _WIN32
 #include <windows.h>
 #include <process.h>
+#define _OBJ ".obj"
+#define _EXE ".exe"
+#define ROOT "C:/"
 #else
 #include <unistd.h>
 #include <sys/stat.h>
+#define _OBJ ".o"
+#define _EXE ""
+#define ROOT "/"
 #endif
+
+
+#define EXECUTABLE(name) name _EXE
+#define OBJECT(name) name _OBJ
 
 typedef const char* string;
 
@@ -84,7 +93,7 @@ EXTERN struct {
 
 #ifdef _WIN32
 void __Build_Switch_New__() {
-    system("start \"\" /B cmd /C \"timeout /t 1 >nul && move /Y build.new build.exe && build.exe\"");
+    system("start \"\" /B cmd /C \"timeout /t 1 >nul && move /Y build.new.exe build.exe && build.exe\"");
     exit(0);
 }
 bool __Build_needs_rebuild__(string output, string sources[], size_t n) {
@@ -103,7 +112,7 @@ bool __Build_needs_rebuild__(string output, string sources[], size_t n) {
         GetFileTime(srcFile, NULL, NULL, &srcTime);
         CloseHandle(srcFile);
 
-        if (CompareFileTime(&srcTime, &outTime) == 1) return true; // src newer than out
+        if (CompareFileTime(&srcTime, &outTime) == 0) return true; // src newer than out
     }
 
     return false;
@@ -205,11 +214,11 @@ bool __Build_Ends_With__(string str, string suffix) {
 
 void __Build_Bootstrap__() { 
     string deps[] = {
-        "build.c",
-        "build.h",
+        "./build.c",
+        "./build.h",
     };
-    if(__Build_needs_rebuild__("./build", deps, 2)) {
-        Build.build("build.new", deps, 2, (Flag[]) {}, 0); 
+    if(__Build_needs_rebuild__(EXECUTABLE("./build"), deps, 2)) {
+        Build.build(EXECUTABLE("./build.new"), deps, 2, (Flag[]) {}, 0); 
         __Build_Switch_New__();
     } else {
         printf("not rebuilding build\n");
@@ -303,7 +312,7 @@ void __Build_Build__(string file, string dep[], size_t dep_length, Flag flags[],
 }
 #elif defined(_MSC_VER)
 
-FlagStringList flag_to_strings_msvc(Flag flag) {
+FlagStringList flag_to_strings(Flag flag, bool* comp_only) {
     FlagStringList result = {0};
     switch (flag.type) {
         case __FLAG_OPTIMIZE_SPEED:
@@ -338,6 +347,7 @@ FlagStringList flag_to_strings_msvc(Flag flag) {
             break;
         case __FLAG_COMPILE_ONLY:
             result.data[0] = "/c";     // compile only, don’t link
+            *comp_only = true;
             result.count = 1;
             break;
         case __FLAG_LANGUAGE_STANDARD:
@@ -370,10 +380,11 @@ void __Build_Build__(string file, string dep[], size_t dep_length, Flag flags[],
         printf("not rebuilding %s\n", file);
         return;
     }
+    bool comp_only = false;
     char cmd[BufferSize] = {'\0'};
     strcat(cmd, "cl ");
     for(size_t i = 0; i < flag_length; i++) {
-        FlagStringList f = flag_to_strings(flags[i]);
+        FlagStringList f = flag_to_strings(flags[i], &comp_only);
         for(size_t ii = 0; ii < f.count; ii++) {
             strcat(cmd, f.data[ii]);
         }
@@ -386,7 +397,11 @@ void __Build_Build__(string file, string dep[], size_t dep_length, Flag flags[],
         strcat(cmd, dep[i]);
         strcat(cmd, " ");
     }
-    strcat(cmd, "/Fe");
+    if(comp_only) {
+        strcat(cmd, "/Fo");
+    } else {
+        strcat(cmd, "/Fe");
+    }
     strcat(cmd, file);
     printf("running cmd %s\n", cmd);
     system(cmd);
@@ -430,4 +445,3 @@ int __Build_Main__(int argc, char **argv);
 int __Build_Main__(int argc, char **argv)
 
 #endif
-
