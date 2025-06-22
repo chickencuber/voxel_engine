@@ -50,7 +50,7 @@ void compile_cmake(string name, string winsln) {
         system(cmd);
 #ifdef _WIN32
         cmd[0] = '\0';
-        sprintf(cmd, "msbuild /deps/%s/build/%s.sln", name, winsln);
+        sprintf(cmd, "msbuild /deps/%s/build/%s.sln p:Configuration=Release", name, winsln);
         system(cmd);
 #endif
     } else {
